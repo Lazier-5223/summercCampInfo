@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   AlertCircle,
   Calendar,
-  Camera,
   CheckCircle2,
   FileText,
   Mail,
@@ -100,7 +99,7 @@ function validateEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
-function buildRegistrationFormData(form: FormState, photo: File | null): FormData {
+function buildRegistrationFormData(form: FormState): FormData {
   const fd = new FormData();
   fd.append("studentLastName", form.studentLastName);
   fd.append("studentFirstName", form.studentFirstName);
@@ -113,6 +112,7 @@ function buildRegistrationFormData(form: FormState, photo: File | null): FormDat
   fd.append("parentName", form.parentName);
   fd.append("relationship", form.relationship);
   fd.append("email", form.email);
+  fd.append("_replyto", form.email);
   fd.append("country", form.country);
   fd.append("addressLine1", form.address1);
   fd.append("addressLine2", form.address2);
@@ -121,20 +121,16 @@ function buildRegistrationFormData(form: FormState, photo: File | null): FormDat
   fd.append("zip", form.zip);
   fd.append("payOption", form.payOption);
   fd.append("policyAccepted", form.policyAccepted ? "yes" : "no");
-  if (photo) fd.append("photo", photo, photo.name);
   return fd;
 }
 
 export default function CampRegistrationPage() {
   const [form, setForm] = useState<FormState>(initialForm);
-  const [photo, setPhoto] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [submitDemo, setSubmitDemo] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const update = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
@@ -146,18 +142,6 @@ export default function CampRegistrationPage() {
     });
   }, []);
 
-  const onPhotoChange = (file: File | null) => {
-    setPhoto(file);
-    setErrors((e) => {
-      const next = { ...e };
-      delete next.photo;
-      return next;
-    });
-    if (photoPreview) URL.revokeObjectURL(photoPreview);
-    if (file) setPhotoPreview(URL.createObjectURL(file));
-    else setPhotoPreview(null);
-  };
-
   const validate = (): boolean => {
     const e: Record<string, string> = {};
     if (!form.studentLastName.trim()) e.studentLastName = "请填写学生姓氏";
@@ -168,7 +152,6 @@ export default function CampRegistrationPage() {
     if (!form.grade) e.grade = "请选择当前年级";
     if (!form.school.trim()) e.school = "请填写就读学校";
     if (!form.shirtSize) e.shirtSize = "请选择 T-Shirt 尺码";
-    if (!photo) e.photo = "请上传孩子近期头像照";
     if (!form.parentName.trim()) e.parentName = "请填写家长姓名";
     if (!form.relationship.trim()) e.relationship = "请填写与孩子关系";
     if (!form.email.trim()) e.email = "请填写常用邮箱";
@@ -189,15 +172,21 @@ export default function CampRegistrationPage() {
     if (!validate()) return;
     setIsSubmitting(true);
     try {
-      const fd = buildRegistrationFormData(form, photo);
+      const fd = buildRegistrationFormData(form);
       const res = await fetch("/api/register", { method: "POST", body: fd });
       const data = (await res.json()) as {
         ok?: boolean;
         demo?: boolean;
         error?: string;
         message?: string;
+        detail?: string;
+        status?: number;
       };
-      if (!res.ok) throw new Error(data.error || "提交失败，请稍后重试");
+      if (!res.ok) {
+        const base = data.error || "提交失败，请稍后重试";
+        const extra = data.detail ? `\n\n详情：${data.detail}` : "";
+        throw new Error(base + extra);
+      }
       setSubmitDemo(Boolean(data.demo));
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -238,6 +227,9 @@ export default function CampRegistrationPage() {
               <p className="mt-1 text-sm text-stone-600">
                 我们已收到您的登记。工作人员将尽快通过您预留的邮箱与您确认。
               </p>
+              <p className="mt-2 text-sm font-medium text-earth">
+                请将孩子近期正脸头像照（1:1 比例、清晰）在提交后单独通过微信发给我。
+              </p>
               {submitDemo && (
                 <p className="mt-2 text-sm text-amber-800">
                   当前为开发模式：未配置 Formspree / Webhook，数据未发送到外部服务。部署时请在服务器环境变量中设置
@@ -254,7 +246,7 @@ export default function CampRegistrationPage() {
             role="alert"
           >
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
-            <div>{submitError}</div>
+            <div className="min-w-0 whitespace-pre-wrap break-words">{submitError}</div>
           </div>
         )}
 
@@ -471,59 +463,12 @@ export default function CampRegistrationPage() {
               )}
             </div>
 
-            <div>
-              <p className="label-text mb-2 text-stone-700">
-                <span className="inline-flex flex-wrap items-center gap-x-1">
-                  <Camera className="h-3.5 w-3.5 shrink-0 text-stone-500" aria-hidden />
-                  照片上传 <span className="text-red-600">*</span>
-                  <span className="font-normal text-stone-600">，比例为 1:1 的清晰照片</span>
-                </span>
+            <div className="rounded-lg border border-earth/25 bg-earth/[0.06] px-4 py-3.5 text-sm leading-relaxed text-stone-800 md:px-5 md:py-4 md:text-base">
+              <p className="font-medium text-earth">孩子头像照</p>
+              <p className="mt-2 text-stone-700">
+                请将孩子近期<strong>正脸头像照</strong>（<strong>1:1</strong>{" "}
+                比例、光线清晰）在提交报名表后，<strong>单独通过微信发给我</strong>。
               </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                onChange={(ev) => {
-                  const f = ev.target.files?.[0] ?? null;
-                  onPhotoChange(f);
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className={`flex w-full flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-10 transition-colors md:py-12 ${
-                  errors.photo
-                    ? "border-red-300 bg-red-50/50"
-                    : "border-stone-300 bg-white hover:border-earth/50 hover:bg-stone-50/80"
-                }`}
-              >
-                {photoPreview ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={photoPreview}
-                    alt="头像预览"
-                    className="mb-3 h-28 w-28 rounded-full object-cover ring-2 ring-earth/20"
-                  />
-                ) : (
-                  <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-stone-100 text-earth">
-                    <Camera className="h-8 w-8" />
-                  </div>
-                )}
-                <span className="text-sm font-medium text-stone-700">
-                  请上传孩子近期头像照，比例为 1:1 的清晰照片
-                </span>
-                <span className="mt-1 text-xs text-stone-500">支持 JPG、PNG，建议正面清晰照片</span>
-                {photo && (
-                  <span className="mt-2 text-xs text-earth">{photo.name}</span>
-                )}
-              </button>
-              {errors.photo && (
-                <p className="mt-2 flex items-center gap-1 text-xs text-red-600">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  {errors.photo}
-                </p>
-              )}
             </div>
 
             <div>
