@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --earth: #a07855;
+  --earth-focus: #8a6648;
+}
+
+body {
+  @apply bg-cream text-stone-800 antialiased;
+}
+
+/* 细边框输入，聚焦棕色 */
+@layer components {
+  .input-field {
+    @apply w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-800 outline-none transition-colors;
+    @apply focus:border-earth focus:ring-1 focus:ring-earth/30;
+  }
+  .input-field-error {
+    @apply border-red-400 focus:border-red-500 focus:ring-red-200;
+  }
+  .label-text {
+    @apply mb-1.5 block text-sm font-medium text-stone-700;
+  }
+  /* 大板块标题（原 xl / 2xl → ×1.5） */
+  .section-title {
+    @apply font-serif text-3xl font-semibold tracking-wide text-earth md:text-4xl;
+  }
+  /* 表单内小标题（原 text-sm → ×1.5） */
+  .form-block-title {
+    @apply mb-4 flex items-center gap-2 text-[1.3125rem] font-medium text-stone-700;
+  }
+  .form-block-subtitle {
+    @apply flex items-center gap-2 text-[1.3125rem] font-medium text-stone-700;
+  }
+  .form-legend-title {
+    @apply mb-3 block text-[1.3125rem] font-medium text-stone-700;
+  }
+}
